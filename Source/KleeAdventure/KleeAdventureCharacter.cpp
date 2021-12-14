@@ -5,8 +5,6 @@
 #include <algorithm>
 #include <random>
 #include "HeadMountedDisplayFunctionLibrary.h"
-#include "KleeAdventure/Public/Projectile/Bullet.h"
-#include "KleeAdventure/Public/Projectile/KleeBomb.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/InputComponent.h"
@@ -39,7 +37,7 @@ AKleeAdventureCharacter::AKleeAdventureCharacter()
 	GetCharacterMovement()->JumpZVelocity = 600.f;
 	GetCharacterMovement()->AirControl = 0.2f;
 
-	
+
 	// Create a camera boom (pulls in towards the player if there is a collision)
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(RootComponent);
@@ -54,21 +52,6 @@ AKleeAdventureCharacter::AKleeAdventureCharacter()
 
 	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
 	// are set in the derived blueprint asset named MyCharacter (to avoid direct content references in C++)
-
-	// Create a gun mesh component
-	GunMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("GunMesh"));
-	GunMesh->SetOnlyOwnerSee(false); // otherwise won't be visible in the multiplayer
-	GunMesh->bCastDynamicShadow = false;
-	GunMesh->CastShadow = false;
-	// FP_Gun->SetupAttachment(Mesh1P, TEXT("GripPoint"));
-	GunMesh->SetupAttachment(RootComponent);
-
-	// Creat Projectile's Spawn Location
-	Bullet_MuzzleLocation = CreateDefaultSubobject<USceneComponent>(TEXT("Bullet_MuzzleLocation"));
-	Bullet_MuzzleLocation->SetupAttachment(GunMesh);
-
-	Bomb_MuzzleLocation = CreateDefaultSubobject<USceneComponent>(TEXT("Bomb_MuzzleLocation"));
-	Bomb_MuzzleLocation->SetupAttachment(GetMesh());
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -85,7 +68,7 @@ void AKleeAdventureCharacter::SetupPlayerInputComponent(class UInputComponent* P
 	PlayerInputComponent->BindAction("Sprint", IE_Released, this, &AKleeAdventureCharacter::StopSprinting);
 
 	PlayerInputComponent->BindAction("Fire", IE_Pressed, this, &AKleeAdventureCharacter::OnFire);
-	PlayerInputComponent->BindAction("Skill", IE_Pressed, this, &AKleeAdventureCharacter::PlayProjectingBomb);
+	PlayerInputComponent->BindAction("Skill", IE_Pressed, this, &AKleeAdventureCharacter::OnSkill);
 
 	PlayerInputComponent->BindAxis("MoveForward", this, &AKleeAdventureCharacter::MoveForward);
 	PlayerInputComponent->BindAxis("MoveRight", this, &AKleeAdventureCharacter::MoveRight);
@@ -109,14 +92,14 @@ void AKleeAdventureCharacter::SetupPlayerInputComponent(class UInputComponent* P
 
 void AKleeAdventureCharacter::RandomPlay(TArray<USoundBase*>& Sounds)
 {
-	if(Sounds.Num() == 0) return;
-	
+	if (Sounds.Num() == 0) return;
+
 	auto RandomEngine = std::mt19937(std::random_device()());
 	auto RandomDistribution = std::uniform_int_distribution<int>(0, Sounds.Num() - 1);
 	int RandomValue = RandomDistribution(RandomEngine);
-	USoundBase *Sound = Sounds[RandomValue];
-	
-	if(Sound != nullptr)
+	USoundBase* Sound = Sounds[RandomValue];
+
+	if (Sound != nullptr)
 	{
 		UGameplayStatics::PlaySoundAtLocation(this, Sound, GetActorLocation());
 	}
@@ -126,10 +109,6 @@ void AKleeAdventureCharacter::RandomPlay(TArray<USoundBase*>& Sounds)
 void AKleeAdventureCharacter::BeginPlay()
 {
 	Super::BeginPlay();
-	
-	GunMesh->AttachToComponent(GetMesh(), FAttachmentTransformRules(EAttachmentRule::SnapToTarget, true),
-							  TEXT("LeftHandSocket"));
-	RandomPlay(this->EnterSounds);
 }
 
 void AKleeAdventureCharacter::OnResetVR()
@@ -155,33 +134,33 @@ void AKleeAdventureCharacter::TouchStopped(ETouchIndex::Type FingerIndex, FVecto
 
 void AKleeAdventureCharacter::Sprint()
 {
-	if(IsProjectingBomb) return;
+	if (BlockingMovementCount != 0) return;
 	IsSprinting = true;
 }
 
 void AKleeAdventureCharacter::StopSprinting()
 {
-	if(IsProjectingBomb) return;
+	if (BlockingMovementCount != 0) return;
 	IsSprinting = false;
 }
 
 void AKleeAdventureCharacter::Jump()
 {
-	if(IsProjectingBomb) return;
+	if (BlockingMovementCount != 0) return;
 	IsJumping = true;
 	Super::Jump();
 }
 
 void AKleeAdventureCharacter::StopJumping()
 {
-	if(IsProjectingBomb) return;
+	if (BlockingMovementCount != 0) return;
 	IsJumping = false;
 	Super::StopJumping();
 }
 
 void AKleeAdventureCharacter::Zoom(float Value)
 {
-	if(Value != 0)
+	if (Value != 0)
 	{
 		float ArmLength = CameraBoom->TargetArmLength + Value;
 		CameraBoom->TargetArmLength = std::min(std::max(ArmLength, CameraRoomMinArmLength), CameraRoomMaxArmLength);
@@ -190,103 +169,25 @@ void AKleeAdventureCharacter::Zoom(float Value)
 
 void AKleeAdventureCharacter::OnFire()
 {
-	EmitBullet();
 }
 
-void AKleeAdventureCharacter::EmitBullet()
+void AKleeAdventureCharacter::OnSkill()
 {
-	if(IsJumping) return;
-	if(IsProjectingBomb) return;
-	
-	// try and fire a projectile
-	if (ProjectileBulletClass != nullptr)
-	{
-		ABullet * Projectile;
-		
-		UWorld* const World = GetWorld();
-		if (World != nullptr)
-		{
-				FVector GunOffset(0,0,0);
-				// const FRotator SpawnRotation = GetControlRotation();
-				const FRotator SpawnRotation = GetActorRotation();
-				// MuzzleOffset is in camera space, so transform it to world space before offsetting from the character location to find the final muzzle position
-				const FVector SpawnLocation = ((Bullet_MuzzleLocation != nullptr)
-												   ? Bullet_MuzzleLocation->GetComponentLocation()
-												   : GetActorLocation()) + SpawnRotation.RotateVector(GunOffset);
-
-				//Set Spawn Collision Handling Override
-				FActorSpawnParameters ActorSpawnParams;
-				ActorSpawnParams.SpawnCollisionHandlingOverride =
-					ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButDontSpawnIfColliding;
-
-				// spawn the projectile at the muzzle
-				Projectile = World->SpawnActor<ABullet>(ProjectileBulletClass, SpawnLocation, SpawnRotation, ActorSpawnParams);
-			
-			if(IsValid(Projectile)) Projectile->SetProjector(this);
-		}
-	}
-	if(BulletAnimation != nullptr)
-	{
-		// Get the animation object for the arms mesh
-		UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
-		if (AnimInstance != nullptr)
-		{
-			// GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Yellow, TEXT("Play"));
-			AnimInstance->Montage_Play(BulletAnimation, 1.f);
-			
-		}
-	}
-	RandomPlay(this->ShootSounds);
 }
 
-void AKleeAdventureCharacter::PlayProjectingBomb()
+void AKleeAdventureCharacter::LockMovement()
 {
-	if(IsProjectingBomb) return;
-	if(IsJumping) return;
-	
-	if(BombAnimation != nullptr)
-	{
-		// Get the animation object for the arms mesh
-		UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
-		if (AnimInstance != nullptr)
-		{
-			IsProjectingBomb = true;
-			AnimInstance->Montage_Play(BombAnimation, 2.0f);
-		}
-	}
+	this->BlockingMovementCount++;
 }
 
-void AKleeAdventureCharacter::EmitBomb()
+void AKleeAdventureCharacter::UnlockMovement()
 {
-	// try and fire a projectile
-	if (ProjectileBombClass != nullptr)
-	{
-		AKleeBomb * Projectile;
-		
-		UWorld* const World = GetWorld();
-		if (World != nullptr)
-		{
-			FVector GunOffset(40,0,50);
-			// const FRotator SpawnRotation = GetControlRotation();
-			FRotator SpawnRotation = GetCapsuleComponent()->GetComponentRotation();
-			SpawnRotation.Pitch += 45;
-			
-			// MuzzleOffset is in camera space, so transform it to world space before offsetting from the character location to find the final muzzle position
-			const FVector SpawnLocation = ((Bomb_MuzzleLocation != nullptr)
-											   ? Bomb_MuzzleLocation->GetComponentLocation()
-											   : GetActorLocation()) + SpawnRotation.RotateVector(GunOffset);
+	this->BlockingMovementCount = std::max(0, this->BlockingMovementCount+1);
+}
 
-			//Set Spawn Collision Handling Override
-			FActorSpawnParameters ActorSpawnParams;
-			ActorSpawnParams.SpawnCollisionHandlingOverride =
-				ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButDontSpawnIfColliding;
-
-			// spawn the projectile at the muzzle
-			Projectile = World->SpawnActor<AKleeBomb>(ProjectileBombClass, SpawnLocation, SpawnRotation, ActorSpawnParams);
-			if(IsValid(Projectile)) Projectile->SetProjector(this);
-			RandomPlay(this->BombSounds);
-		}
-	}
+bool AKleeAdventureCharacter::IsLockingMovement()
+{
+	return (this->BlockingMovementCount != 0);
 }
 
 void AKleeAdventureCharacter::TurnAtRate(float Rate)
@@ -303,7 +204,7 @@ void AKleeAdventureCharacter::LookUpAtRate(float Rate)
 
 void AKleeAdventureCharacter::MoveForward(float Value)
 {
-	if(IsProjectingBomb) return;
+	if (BlockingMovementCount != 0) return;
 	if ((Controller != nullptr) && (Value != 0.0f))
 	{
 		// find out which way is forward
@@ -312,13 +213,13 @@ void AKleeAdventureCharacter::MoveForward(float Value)
 
 		// get forward vector
 		const FVector Direction = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
-		AddMovementInput(Direction, Value * (IsSprinting ?  SprintingSpeed : WalkingSpeed));
+		AddMovementInput(Direction, Value * (IsSprinting ? SprintingSpeed : WalkingSpeed));
 	}
 }
 
 void AKleeAdventureCharacter::MoveRight(float Value)
 {
-	if(IsProjectingBomb) return;
+	if (BlockingMovementCount != 0) return;
 	if ((Controller != nullptr) && (Value != 0.0f))
 	{
 		// find out which way is right
@@ -328,6 +229,6 @@ void AKleeAdventureCharacter::MoveRight(float Value)
 		// get right vector 
 		const FVector Direction = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
 		// add movement in that direction
-		AddMovementInput(Direction, Value * (IsSprinting ?  SprintingSpeed : WalkingSpeed));
+		AddMovementInput(Direction, Value * (IsSprinting ? SprintingSpeed : WalkingSpeed));
 	}
 }

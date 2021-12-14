@@ -10,7 +10,7 @@ UCLASS(config=Game)
 class AKleeAdventureCharacter : public ACharacter
 {
 	GENERATED_BODY()
-
+public:
 	/** Camera boom positioning the camera behind the character */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
 	class USpringArmComponent* CameraBoom;
@@ -18,43 +18,6 @@ class AKleeAdventureCharacter : public ACharacter
 	/** Follow camera */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
 	class UCameraComponent* FollowCamera;
-
-	UPROPERTY(VisibleDefaultsOnly, Category = Mesh)
-	USkeletalMeshComponent* GunMesh;
-
-	/** Location on gun mesh where projectiles should spawn. */
-	UPROPERTY(VisibleDefaultsOnly, Category = Mesh)
-	USceneComponent* Bullet_MuzzleLocation;
-
-	UPROPERTY(VisibleDefaultsOnly, Category = Mesh)
-	USceneComponent* Bomb_MuzzleLocation;
-
-	/** Projectile KleeBomb class to spawn */
-	UPROPERTY(EditDefaultsOnly, Category=Projectile)
-	TSubclassOf<class AKleeBomb> ProjectileBombClass;
-
-	/** Projectile Bullet class to spawn */
-	UPROPERTY(EditDefaultsOnly, Category=Projectile)
-	TSubclassOf<class ABullet> ProjectileBulletClass;
-
-protected:
-	/** AnimMontage to play each time we fire */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Gameplay)
-	UAnimMontage* BulletAnimation;
-
-	/** AnimMontage to play each time we fire */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Gameplay)
-	UAnimMontage* BombAnimation;
-
-public:
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TArray<class USoundBase*> EnterSounds;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TArray<class USoundBase*> ShootSounds;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TArray<class USoundBase*> BombSounds;
 
 public:
 	AKleeAdventureCharacter();
@@ -84,13 +47,12 @@ public:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	bool IsJumping = false;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
-	bool IsProjectingBomb = false;
-
-
+	
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
 	int Score = 0;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	int BlockingMovementCount = 0;
 	
 protected:
 	virtual void BeginPlay() override;
@@ -132,23 +94,26 @@ protected:
 
 	virtual void StopJumping() override;
 
-	void Zoom(float Value);
-
-	void OnFire();
+	virtual void Zoom(float Value);
 
 	UFUNCTION(BlueprintCallable)
-	void EmitBullet();
+	virtual void OnFire();
+	
+	UFUNCTION(BlueprintCallable)
+	virtual void OnSkill();
 
 	UFUNCTION(BlueprintCallable)
-	void PlayProjectingBomb();
+	void LockMovement();
 
 	UFUNCTION(BlueprintCallable)
-	void EmitBomb();
+	void UnlockMovement();
 
-
+	UFUNCTION(BlueprintCallable)
+	bool IsLockingMovement();
+	
 protected:
 	// APawn interface
-	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
+	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent);
 	// End of APawn interface
 
 public:
@@ -157,6 +122,6 @@ public:
 	/** Returns FollowCamera subobject **/
 	FORCEINLINE class UCameraComponent* GetFollowCamera() const { return FollowCamera; }
 
-private:
+protected:
 	void RandomPlay(TArray<class USoundBase*> &Sounds);
 };
