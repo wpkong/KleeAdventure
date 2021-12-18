@@ -44,15 +44,14 @@ void AKleePlayerController::BeginPlay()
 	{
 		CharacterHealthHUD->AddToViewport();
 	}
-
-	if(GameOverHUDAsset)
-	{
-		GameOverHUD = CreateWidget<UUserWidget>(this, GameOverHUDAsset);
-	}
 }
 
 void AKleePlayerController::GameOver()
 {
+	if(GameOverHUDAsset)
+	{
+		GameOverHUD = CreateWidget<UUserWidget>(this, GameOverHUDAsset);
+	}
 	if(GameOverHUD)
 	{
 		GameOverHUD->AddToViewport();

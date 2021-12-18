@@ -34,10 +34,11 @@ void AKleeAdventureGameState::MulticastOnMissionComplete_Implementation()
 
 void AKleeAdventureGameState::AddScore()
 {
-	Score += 1;
+	FPlatformAtomics::InterlockedIncrement(&Score);
 	if(Score >= MaxScore)
 	{
-		ServerEndGame();
+		if(GetLocalRole() == ROLE_Authority)
+			ServerEndGame();
 	}
 }
 

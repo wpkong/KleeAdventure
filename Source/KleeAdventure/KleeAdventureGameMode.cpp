@@ -44,10 +44,13 @@ void AKleeAdventureGameMode::CalcMaxEnemies_Implementation()
 	if(EnemyClass)
 	{
 		TArray<AActor*> FoundActors;
-		UGameplayStatics::GetAllActorsOfClass(GetWorld(), EnemyClass, FoundActors);
+		auto Wold = GetWorld();
+		if(Wold == nullptr) return;
+		UGameplayStatics::GetAllActorsOfClass(Wold, EnemyClass, FoundActors);
 		AKleeAdventureGameState *GS = GetGameState<AKleeAdventureGameState>();
 		if(GS)
 		{
+			// GS->SetMaxScore(FoundActors.Num());
 			GS->SetMaxScore(FoundActors.Num());
 		}
 	}
