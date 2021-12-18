@@ -3,12 +3,13 @@
 
 #include "Projectile/KleeBullet.h"
 
+#include "KleeAdventureEnemy.h"
 #include "KleeAdventure/KleeAdventureCharacter.h"
 #include "Components/SphereComponent.h"
 #include "GameFramework/ProjectileMovementComponent.h"
 
 // Sets default values
-AKleeBullet::AKleeBullet()
+AKleeBullet::AKleeBullet(): AProjectile()
 {
  	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
@@ -17,7 +18,7 @@ AKleeBullet::AKleeBullet()
 	CollisionComp = CreateDefaultSubobject<USphereComponent>(TEXT("SphereComp"));
 	CollisionComp->InitSphereRadius(5.0f);
 	CollisionComp->BodyInstance.SetCollisionProfileName("Projectile");
-	CollisionComp->OnComponentHit.AddDynamic(this, &AKleeBullet::OnHit);		// set up a notification for when this component hits something blocking
+	// CollisionComp->OnComponentHit.AddDynamic(this, &AKleeBullet::OnHit);		// set up a notification for when this component hits something blocking
 
 	// Players can't walk on it
 	CollisionComp->SetWalkableSlopeOverride(FWalkableSlopeOverride(WalkableSlope_Unwalkable, 0.f));
@@ -42,6 +43,9 @@ AKleeBullet::AKleeBullet()
 void AKleeBullet::BeginPlay()
 {
 	Super::BeginPlay();
+
+	CollisionComp->OnComponentBeginOverlap.AddDynamic(this, &AKleeBullet::OnSphereOverlapBegin);
+	CollisionComp->OnComponentEndOverlap.AddDynamic(this, &AKleeBullet::OnSphereOverlapEnd);
 }
 
 // Called every frame
@@ -59,12 +63,53 @@ void AKleeBullet::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrimi
 	if ((OtherActor != nullptr) && (OtherActor != this) && (OtherComp != nullptr) && OtherComp->IsSimulatingPhysics())
 	{
 		OtherComp->AddImpulseAtLocation(GetVelocity() * 100.0f, GetActorLocation());
-		Projector->Score++;
 	}
 
 	if ((OtherActor != nullptr) && (OtherActor != this))
 	{
 		Destroy();
 	}
+}
+
+void AKleeBullet::OnSphereOverlapBegin(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
+	UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+{
+	if(OtherActor == nullptr || OtherActor == this || OtherActor == Projector) return;
+	
+	if(!Cast<AKleeAdventureCharacter>(OtherActor))
+	{
+		if(GetLocalRole() == ROLE_Authority)
+		{
+			Destroy();
+		}
+	}
+	if(auto OtherEnemy = Cast<AKleeAdventureEnemy>(OtherActor))
+	{
+		OtherEnemy->Damage(10);
+		OtherComp->AddImpulseAtLocation(GetVelocity() * 0.1f, GetActorLocation());
+		if(GetLocalRole() == ROLE_Authority)
+		{
+			Destroy();
+		}
+	}else if(auto OtherPlayer = Cast<AKleeAdventureCharacter>(OtherActor))
+	{
+		// DO nothing
+		// GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Yellow, "Hit Character");
+		// GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Yellow, OtherActor->GetName());
+		// GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Yellow, Projector->GetName());
+		
+	}else
+	{
+		if(GetLocalRole() == ROLE_Authority)
+		{
+			Destroy();
+		}
+	}
+}
+
+void AKleeBullet::OnSphereOverlapEnd(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
+	UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
+{
+	
 }
 

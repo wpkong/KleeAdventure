@@ -1,7 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "KleeAdventureCharacter.h"
-
+#include "Components/SphereComponent.h"
 #include <algorithm>
 #include <random>
 #include "HeadMountedDisplayFunctionLibrary.h"
@@ -13,6 +13,15 @@
 #include "GameFramework/Controller.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Kismet/GameplayStatics.h"
+#include "Net/UnrealNetwork.h"
+
+
+void AKleeAdventureCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(AKleeAdventureCharacter, CurrentHealth);
+	DOREPLIFETIME(AKleeAdventureCharacter, MaxHealth);
+}
 
 //////////////////////////////////////////////////////////////////////////
 // AKleeAdventureCharacter
@@ -52,11 +61,17 @@ AKleeAdventureCharacter::AKleeAdventureCharacter()
 
 	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
 	// are set in the derived blueprint asset named MyCharacter (to avoid direct content references in C++)
+
+	VisionSphere = CreateDefaultSubobject<USphereComponent>(TEXT("VisionSphere"));
+	VisionSphere->SetupAttachment(RootComponent);
+	VisionSphere->SetSphereRadius(800.0);
+
+	bReplicates = true;
 }
+
 
 //////////////////////////////////////////////////////////////////////////
 // Input
-
 void AKleeAdventureCharacter::SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent)
 {
 	// Set up gameplay key bindings
@@ -90,6 +105,29 @@ void AKleeAdventureCharacter::SetupPlayerInputComponent(class UInputComponent* P
 	PlayerInputComponent->BindAction("ResetVR", IE_Pressed, this, &AKleeAdventureCharacter::OnResetVR);
 }
 
+void AKleeAdventureCharacter::OnVisionSphereOverlapBegin(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
+                                                         UPrimitiveComponent* OtherComp, int32 OtherBodyIndex,
+                                                         bool bFromSweep, const FHitResult& SweepResult)
+{
+	if (OtherActor == this || OtherActor == nullptr) return;
+
+	if (auto Other = Cast<AKleeAdventureCharacter>(OtherActor))
+	{
+		CharactersInSight.Remove(Other);
+	}
+}
+
+void AKleeAdventureCharacter::OnVisionSphereOverlapEnd(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
+                                                       UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
+{
+	if (OtherActor == this || OtherActor == nullptr) return;
+
+	if (auto Other = Cast<AKleeAdventureCharacter>(OtherActor))
+	{
+		CharactersInSight.Add(Other);
+	}
+}
+
 void AKleeAdventureCharacter::RandomPlay(TArray<USoundBase*>& Sounds)
 {
 	if (Sounds.Num() == 0) return;
@@ -109,6 +147,9 @@ void AKleeAdventureCharacter::RandomPlay(TArray<USoundBase*>& Sounds)
 void AKleeAdventureCharacter::BeginPlay()
 {
 	Super::BeginPlay();
+
+	VisionSphere->OnComponentBeginOverlap.AddDynamic(this, &AKleeAdventureCharacter::OnVisionSphereOverlapBegin);
+	VisionSphere->OnComponentEndOverlap.AddDynamic(this, &AKleeAdventureCharacter::OnVisionSphereOverlapEnd);
 }
 
 void AKleeAdventureCharacter::OnResetVR()
@@ -182,12 +223,31 @@ void AKleeAdventureCharacter::LockMovement()
 
 void AKleeAdventureCharacter::UnlockMovement()
 {
-	this->BlockingMovementCount = std::max(0, this->BlockingMovementCount+1);
+	this->BlockingMovementCount = std::max(0, this->BlockingMovementCount - 1);
 }
 
 bool AKleeAdventureCharacter::IsLockingMovement()
 {
 	return (this->BlockingMovementCount != 0);
+}
+
+void AKleeAdventureCharacter::Cure(int32 Value)
+{
+	if (GetLocalRole() == ROLE_Authority)
+	{
+		CurrentHealth = std::min(CurrentHealth + Value, MaxHealth);
+	}
+	// ServerCure(Value);
+}
+
+void AKleeAdventureCharacter::Damage(int32 Value)
+{
+	if (GetLocalRole() == ROLE_Authority)
+	{
+		CurrentHealth = std::max(CurrentHealth - Value, 0);
+		if (CurrentHealth <= 0) LockMovement();
+	}
+	// ServerDamage(Value);
 }
 
 void AKleeAdventureCharacter::TurnAtRate(float Rate)

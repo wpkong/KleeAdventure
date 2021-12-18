@@ -46,4 +46,7 @@ public:
 
 	UFUNCTION(BlueprintCallable, BlueprintImplementableEvent)
 	void ApplyBombImpulsion();
+	
+	UFUNCTION(BlueprintCallable)
+	void ApplyBombOnSingleTarget(UPrimitiveComponent* HitComp, AActor* OtherActor);
 };

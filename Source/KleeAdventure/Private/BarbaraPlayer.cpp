@@ -26,34 +26,8 @@ void ABarbaraPlayer::BeginPlay()
 	RandomPlay(this->EnterSounds);
 }
 
-void ABarbaraPlayer::OnFire()
+void ABarbaraPlayer::ServerEmitMagicBall_Implementation()
 {
-	if (Super::IsLockingMovement()) return;
-	if (IsJumping) return;
-	if (EmitMagicBallAnimation != nullptr)
-	{
-		// Get the animation object for the arms mesh
-		// GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Yellow, TEXT("Fire0"));
-		UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
-		GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Yellow, TEXT("Fire1"));
-		if (AnimInstance != nullptr)
-		{
-			GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Yellow, TEXT("MagicBallAnimation"));
-			AnimInstance->Montage_Play(EmitMagicBallAnimation, 1.f);
-			LockMovement();
-		}
-	}
-	RandomPlay(this->ShootSounds);
-}
-
-void ABarbaraPlayer::OnSkill()
-{
-	Super::OnSkill();
-}
-
-void ABarbaraPlayer::EmitMagicBall()
-{
-	// try and fire a projectile
 	if (ProjectileMagicBallClass != nullptr)
 	{
 		ABarbaraMagicBall* Projectile;
@@ -81,4 +55,89 @@ void ABarbaraPlayer::EmitMagicBall()
 			if (IsValid(Projectile)) Projectile->SetProjector(this);
 		}
 	}
+}
+
+bool ABarbaraPlayer::ServerEmitMagicBall_Validate()
+{
+	return true;
+}
+
+void ABarbaraPlayer::ServerPlayEmitMagicBallAnim_Implementation()
+{
+	MulticastPlayEmitMagicBallAnim();
+}
+
+bool ABarbaraPlayer::ServerPlayEmitMagicBallAnim_Validate()
+{
+	return true;
+}
+
+void ABarbaraPlayer::MulticastPlayEmitMagicBallAnim_Implementation()
+{
+	if (EmitMagicBallAnimation != nullptr)
+	{
+		// Get the animation object for the arms mesh
+		// GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Yellow, TEXT("Fire0"));
+		UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+		// GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Yellow, TEXT("Fire1"));
+		if (AnimInstance != nullptr)
+		{
+			// GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Yellow, TEXT("MagicBallAnimation"));
+			AnimInstance->Montage_Play(EmitMagicBallAnimation, 2.0);
+			LockMovement();
+		}
+	}
+}
+
+bool ABarbaraPlayer::MulticastPlayEmitMagicBallAnim_Validate()
+{
+	return true;
+}
+
+void ABarbaraPlayer::OnFire()
+{
+	if (Super::IsLockingMovement()) return;
+	if (IsJumping) return;
+	// ServerPlayEmitMagicBallAnim_Implementation();
+	ServerPlayEmitMagicBallAnim();
+	
+	RandomPlay(this->ShootSounds);
+}
+
+void ABarbaraPlayer::OnSkill()
+{
+	Super::OnSkill();
+}
+
+void ABarbaraPlayer::EmitMagicBall()
+{
+	ServerEmitMagicBall();
+	// try and fire a projectile
+	// if (ProjectileMagicBallClass != nullptr)
+	// {
+	// 	ABarbaraMagicBall* Projectile;
+	//
+	// 	UWorld* const World = GetWorld();
+	// 	if (World != nullptr)
+	// 	{
+	// 		FVector GunOffset(0, 0, 0);
+	// 		// const FRotator SpawnRotation = GetControlRotation();
+	// 		const FRotator SpawnRotation = GetActorRotation();
+	// 		// MuzzleOffset is in camera space, so transform it to world space before offsetting from the character location to find the final muzzle position
+	// 		const FVector SpawnLocation = ((MagicBall_MuzzleLocation != nullptr)
+	// 										   ? MagicBall_MuzzleLocation->GetComponentLocation()
+	// 										   : GetActorLocation()) + SpawnRotation.RotateVector(GunOffset);
+	//
+	// 		//Set Spawn Collision Handling Override
+	// 		FActorSpawnParameters ActorSpawnParams;
+	// 		ActorSpawnParams.SpawnCollisionHandlingOverride =
+	// 			ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButDontSpawnIfColliding;
+	//
+	// 		// spawn the projectile at the muzzle
+	// 		Projectile = World->SpawnActor<ABarbaraMagicBall>(ProjectileMagicBallClass, SpawnLocation, SpawnRotation,
+	// 												ActorSpawnParams);
+	//
+	// 		if (IsValid(Projectile)) Projectile->SetProjector(this);
+	// 	}
+	// }
 }

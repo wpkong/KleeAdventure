@@ -64,6 +64,24 @@ protected:
 public:
 	AKleePlayer();
 
+	UFUNCTION(Server, Reliable, WithValidation)
+	void ServerEmitBullet();
+
+	UFUNCTION(Server, Reliable, WithValidation)
+	void ServerPlayEmitBulletAnim();
+
+	UFUNCTION(NetMulticast, Reliable, WithValidation)
+	void MulticastPlayEmitBulletAnim();
+
+	UFUNCTION(Server, Reliable, WithValidation)
+	void ServerEmitBomb();
+
+	UFUNCTION(Server, Reliable, WithValidation)
+	void ServerPlayEmitBombAnim();
+
+	UFUNCTION(NetMulticast, Reliable, WithValidation)
+	void MulticastPlayEmitBombAnim();
+
 	virtual void BeginPlay() override;
 	
 	// UFUNCTION(BlueprintCallable)

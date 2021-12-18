@@ -48,6 +48,15 @@ public:
 	ABarbaraPlayer();
 	
 	virtual void BeginPlay() override;
+
+	UFUNCTION(Server, Reliable, WithValidation)
+	void ServerEmitMagicBall();
+
+	UFUNCTION(Server, Reliable, WithValidation)
+	void ServerPlayEmitMagicBallAnim();
+
+	UFUNCTION(NetMulticast, Reliable, WithValidation)
+	void MulticastPlayEmitMagicBallAnim();
 	
 	// UFUNCTION(BlueprintCallable)
 	virtual void OnFire() override;

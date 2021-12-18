@@ -19,6 +19,19 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
 	class UCameraComponent* FollowCamera;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	class USphereComponent* VisionSphere;
+
+public:
+	UPROPERTY(Replicated, EditAnywhere, BlueprintReadWrite)
+	int MaxHealth = 100;
+
+	UPROPERTY(Replicated, EditAnywhere, BlueprintReadWrite)
+	int CurrentHealth = 100;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	TSet<AKleeAdventureCharacter *> CharactersInSight;
+	
 public:
 	AKleeAdventureCharacter();
 
@@ -48,9 +61,6 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	bool IsJumping = false;
 	
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
-	int Score = 0;
-
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
 	int BlockingMovementCount = 0;
 	
@@ -110,11 +120,28 @@ protected:
 
 	UFUNCTION(BlueprintCallable)
 	bool IsLockingMovement();
+
+public:
+	UFUNCTION(BlueprintCallable)
+	void Cure(int32 Value);
+
+	UFUNCTION(BlueprintCallable)
+	void Damage(int32 Value);
 	
 protected:
 	// APawn interface
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent);
 	// End of APawn interface
+
+public:
+	UFUNCTION()
+	void OnVisionSphereOverlapBegin(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
+									UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep,
+									const FHitResult& SweepResult);
+
+	UFUNCTION()
+	void OnVisionSphereOverlapEnd(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
+								  UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
 
 public:
 	/** Returns CameraBoom subobject **/

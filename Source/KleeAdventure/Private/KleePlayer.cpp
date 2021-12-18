@@ -11,8 +11,8 @@ void AKleePlayer::SetupPlayerInputComponent(UInputComponent* PlayerInputComponen
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
 
-	PlayerInputComponent->BindAction("Fire", IE_Pressed, this, &AKleePlayer::OnFire);
-	PlayerInputComponent->BindAction("Skill", IE_Pressed, this, &AKleePlayer::OnSkill);
+	// PlayerInputComponent->BindAction("Fire", IE_Pressed, this, &AKleePlayer::OnFire);
+	// PlayerInputComponent->BindAction("Skill", IE_Pressed, this, &AKleePlayer::OnSkill);
 }
 
 AKleePlayer::AKleePlayer():AKleeAdventureCharacter()
@@ -33,18 +33,62 @@ AKleePlayer::AKleePlayer():AKleeAdventureCharacter()
 	Bomb_MuzzleLocation->SetupAttachment(GetMesh());
 }
 
-void AKleePlayer::BeginPlay()
+void AKleePlayer::MulticastPlayEmitBulletAnim_Implementation()
 {
-	Super::BeginPlay();
-	
-	GunMesh->AttachToComponent(GetMesh(), FAttachmentTransformRules(EAttachmentRule::SnapToTarget, true),
-							   TEXT("LeftHandSocket"));
-	RandomPlay(this->EnterSounds);
 }
 
-void AKleePlayer::EmitBomb()
+bool AKleePlayer::MulticastPlayEmitBulletAnim_Validate()
 {
-	// try and fire a projectile
+	return true;
+}
+
+void AKleePlayer::ServerPlayEmitBulletAnim_Implementation()
+{
+}
+
+bool AKleePlayer::ServerPlayEmitBulletAnim_Validate()
+{
+	return true;
+}
+
+void AKleePlayer::ServerEmitBullet_Implementation()
+{
+	if (ProjectileBulletClass != nullptr)
+	{
+		AKleeBullet* Projectile;
+	
+		UWorld* const World = GetWorld();
+		if (World != nullptr)
+		{
+			FVector GunOffset(0, 0, 0);
+			// const FRotator SpawnRotation = GetControlRotation();
+			const FRotator SpawnRotation = GetActorRotation();
+			// MuzzleOffset is in camera space, so transform it to world space before offsetting from the character location to find the final muzzle position
+			const FVector SpawnLocation = ((Bullet_MuzzleLocation != nullptr)
+											   ? Bullet_MuzzleLocation->GetComponentLocation()
+											   : GetActorLocation()) + SpawnRotation.RotateVector(GunOffset);
+	
+			//Set Spawn Collision Handling Override
+			FActorSpawnParameters ActorSpawnParams;
+			ActorSpawnParams.SpawnCollisionHandlingOverride =
+				ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButDontSpawnIfColliding;
+	
+			// spawn the projectile at the muzzle
+			Projectile = World->SpawnActor<AKleeBullet>(ProjectileBulletClass, SpawnLocation, SpawnRotation,
+													ActorSpawnParams);
+	
+			if (IsValid(Projectile)) Projectile->SetProjector(this);
+		}
+	}
+}
+
+bool AKleePlayer::ServerEmitBullet_Validate()
+{
+	return true;
+}
+
+void AKleePlayer::ServerEmitBomb_Implementation()
+{
 	if (ProjectileBombClass != nullptr)
 	{
 		AKleeBomb* Projectile;
@@ -71,9 +115,59 @@ void AKleePlayer::EmitBomb()
 			Projectile = World->SpawnActor<AKleeBomb>(ProjectileBombClass, SpawnLocation, SpawnRotation,
 													  ActorSpawnParams);
 			if (IsValid(Projectile)) Projectile->SetProjector(this);
-			RandomPlay(this->BombSounds);
+			// RandomPlay(this->BombSounds);
 		}
 	}
+}
+
+bool AKleePlayer::ServerEmitBomb_Validate()
+{
+	return true;
+}
+
+void AKleePlayer::ServerPlayEmitBombAnim_Implementation()
+{
+	MulticastPlayEmitBombAnim();
+}
+
+bool AKleePlayer::ServerPlayEmitBombAnim_Validate()
+{
+	return true;
+}
+
+void AKleePlayer::MulticastPlayEmitBombAnim_Implementation()
+{
+	if (BombAnimation != nullptr)
+	{
+		// Get the animation object for the arms mesh
+		UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+		if (AnimInstance != nullptr)
+		{
+			LockMovement();
+			AnimInstance->Montage_Play(BombAnimation, 2.0f);
+		}
+	}
+}
+
+bool AKleePlayer::MulticastPlayEmitBombAnim_Validate()
+{
+	return true;
+}
+
+void AKleePlayer::BeginPlay()
+{
+	Super::BeginPlay();
+	
+	GunMesh->AttachToComponent(GetMesh(), FAttachmentTransformRules(EAttachmentRule::SnapToTarget, true),
+							   TEXT("LeftHandSocket"));
+	RandomPlay(this->EnterSounds);
+}
+
+void AKleePlayer::EmitBomb()
+{
+	// try and fire a projectile
+	// ServerEmitBomb_Implementation();
+	ServerEmitBomb();
 }
 
 
@@ -81,46 +175,12 @@ void AKleePlayer::OnFire()
 {
 	
 	if (IsJumping) return;
-	if (BlockingMovementCount != 0) return;
+	if (IsLockingMovement()) return;
 
-	// try and fire a projectile
-	if (ProjectileBulletClass != nullptr)
-	{
-		AKleeBullet* Projectile;
-
-		UWorld* const World = GetWorld();
-		if (World != nullptr)
-		{
-			FVector GunOffset(0, 0, 0);
-			// const FRotator SpawnRotation = GetControlRotation();
-			const FRotator SpawnRotation = GetActorRotation();
-			// MuzzleOffset is in camera space, so transform it to world space before offsetting from the character location to find the final muzzle position
-			const FVector SpawnLocation = ((Bullet_MuzzleLocation != nullptr)
-											   ? Bullet_MuzzleLocation->GetComponentLocation()
-											   : GetActorLocation()) + SpawnRotation.RotateVector(GunOffset);
-
-			//Set Spawn Collision Handling Override
-			FActorSpawnParameters ActorSpawnParams;
-			ActorSpawnParams.SpawnCollisionHandlingOverride =
-				ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButDontSpawnIfColliding;
-
-			// spawn the projectile at the muzzle
-			Projectile = World->SpawnActor<AKleeBullet>(ProjectileBulletClass, SpawnLocation, SpawnRotation,
-													ActorSpawnParams);
-
-			if (IsValid(Projectile)) Projectile->SetProjector(this);
-		}
-	}
-	if (BulletAnimation != nullptr)
-	{
-		// Get the animation object for the arms mesh
-		UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
-		if (AnimInstance != nullptr)
-		{
-			// GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Yellow, TEXT("Play"));
-			AnimInstance->Montage_Play(BulletAnimation, 1.f);
-		}
-	}
+	// ServerFireWithAnim_Implementation();
+	ServerEmitBullet();
+	ServerPlayEmitBulletAnim();
+	
 	RandomPlay(this->ShootSounds);
 }
 
@@ -129,14 +189,6 @@ void AKleePlayer::OnSkill()
 	if (BlockingMovementCount != 0) return;
 	if (IsJumping) return;
 
-	if (BombAnimation != nullptr)
-	{
-		// Get the animation object for the arms mesh
-		UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
-		if (AnimInstance != nullptr)
-		{
-			BlockingMovementCount++;
-			AnimInstance->Montage_Play(BombAnimation, 2.0f);
-		}
-	}
+	// ServerPlayEmitBombAnim_Implementation();
+	ServerPlayEmitBombAnim();
 }

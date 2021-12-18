@@ -28,6 +28,17 @@ public:
 	TSubclassOf<UUserWidget> ScoreHUDAsset;
 	UUserWidget *ScoreHUD;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TSubclassOf<UUserWidget> CharacterHealthHUDAsset;
+	UUserWidget *CharacterHealthHUD;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TSubclassOf<UUserWidget> GameOverHUDAsset;
+	UUserWidget *GameOverHUD;
+
 public:
 	virtual void BeginPlay() override;
+
+	UFUNCTION(BlueprintCallable)
+	void GameOver();
 };

@@ -35,4 +35,26 @@ void AKleePlayerController::BeginPlay()
 	{
 		ScoreHUD->AddToViewport();
 	}
+
+	if (CharacterHealthHUDAsset)
+	{
+		CharacterHealthHUD = CreateWidget<UUserWidget>(this, CharacterHealthHUDAsset);
+	}
+	if (CharacterHealthHUD)
+	{
+		CharacterHealthHUD->AddToViewport();
+	}
+
+	if(GameOverHUDAsset)
+	{
+		GameOverHUD = CreateWidget<UUserWidget>(this, GameOverHUDAsset);
+	}
+}
+
+void AKleePlayerController::GameOver()
+{
+	if(GameOverHUD)
+	{
+		GameOverHUD->AddToViewport();
+	}
 }

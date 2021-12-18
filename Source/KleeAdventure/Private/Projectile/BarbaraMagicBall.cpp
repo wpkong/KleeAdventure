@@ -3,9 +3,11 @@
 
 #include "Projectile/BarbaraMagicBall.h"
 #include "Components/SphereComponent.h"
+#include "KleeAdventure/Public/KleeAdventureEnemy.h"
+#include "KleeAdventure/Public/KleePlayer.h"
 #include "GameFramework/ProjectileMovementComponent.h"
 
-ABarbaraMagicBall::ABarbaraMagicBall()
+ABarbaraMagicBall::ABarbaraMagicBall(): AProjectile()
 {
 	PrimaryActorTick.bCanEverTick = true;
 
@@ -13,8 +15,8 @@ ABarbaraMagicBall::ABarbaraMagicBall()
 	CollisionComp = CreateDefaultSubobject<USphereComponent>(TEXT("SphereComp"));
 	CollisionComp->InitSphereRadius(5.0f);
 	CollisionComp->BodyInstance.SetCollisionProfileName("Projectile");
-	CollisionComp->OnComponentHit.AddDynamic(this, &ABarbaraMagicBall::OnHit);		// set up a notification for when this component hits something blocking
-
+	// CollisionComp->OnComponentHit.AddDynamic(this, &ABarbaraMagicBall::OnHit);		// set up a notification for when this component hits something blocking
+	
 	// Players can't walk on it
 	CollisionComp->SetWalkableSlopeOverride(FWalkableSlopeOverride(WalkableSlope_Unwalkable, 0.f));
 	CollisionComp->CanCharacterStepUpOn = ECB_No;
@@ -37,6 +39,9 @@ ABarbaraMagicBall::ABarbaraMagicBall()
 void ABarbaraMagicBall::BeginPlay()
 {
 	Super::BeginPlay();
+
+	CollisionComp->OnComponentBeginOverlap.AddDynamic(this, &ABarbaraMagicBall::OnSphereOverlapBegin);
+	// CollisionComp->OnComponentEndOverlap.AddDynamic(this, &ABarbaraMagicBall::OnSphereOverlapEnd);
 }
 
 void ABarbaraMagicBall::Tick(float DeltaTime)
@@ -48,4 +53,55 @@ void ABarbaraMagicBall::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, 
 	FVector NormalImpulse, const FHitResult& Hit)
 {
 	
+}
+
+void ABarbaraMagicBall::OnSphereOverlapBegin(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
+	UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+{
+	if(OtherActor == nullptr || OtherActor == this || OtherActor == Projector) return;
+
+	if(!Cast<AKleeAdventureCharacter>(OtherActor))
+	{
+		if(GetLocalRole() == ROLE_Authority)
+		{
+			Destroy();
+		}
+		return;
+	}
+	
+	if(auto OtherEnemy = Cast<AKleeAdventureEnemy>(OtherActor))
+	{
+		if(GetLocalRole() == ROLE_Authority)
+		{
+			OtherEnemy->Damage(20);
+			OtherComp->AddImpulseAtLocation(GetVelocity() * 10.0f, GetActorLocation());
+			Destroy();
+		}
+	}else if(auto OtherPlayer = Cast<AKleePlayer>(OtherActor))
+	{
+		// DO nothing
+		// GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Yellow, "Hit Character");
+		// GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Yellow, OtherActor->GetName());
+		// GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Yellow, Projector->GetName());
+		if(GetLocalRole() == ROLE_Authority)
+		{
+			OtherPlayer->Cure(10);
+			Destroy();
+		}
+	}else if(auto Self = Cast<AKleeAdventureCharacter>(OtherActor))
+	{
+		
+	}else
+	{
+		if(GetLocalRole() == ROLE_Authority)
+		{
+			Destroy();
+		}
+	}
+	
+}
+
+void ABarbaraMagicBall::OnSphereOverlapEnd(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
+	UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
+{
 }

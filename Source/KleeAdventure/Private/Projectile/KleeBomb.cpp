@@ -3,11 +3,12 @@
 
 #include "Projectile/KleeBomb.h"
 
+#include "KleeAdventure/Public/KleeAdventureEnemy.h"
 #include "Components/SphereComponent.h"
 #include "GameFramework/ProjectileMovementComponent.h"
 
 // Sets default values
-AKleeBomb::AKleeBomb()
+AKleeBomb::AKleeBomb(): AProjectile()
 {
  	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
@@ -64,9 +65,23 @@ inline void AKleeBomb::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, U
 	{
 		ActivateBomb();
 		ApplyBombImpulsion();
-		if(LifeHop-- <= 0)
+		if(GetLocalRole() == ROLE_Authority)
 		{
-			Destroy();
+			if(LifeHop-- <= 0)
+            		{
+            			Destroy();
+            		}
 		}
+	}
+}
+
+void AKleeBomb::ApplyBombOnSingleTarget(UPrimitiveComponent* HitComp, AActor* OtherActor)
+{
+	if(OtherActor == nullptr || OtherActor == this) return;
+	if(auto OtherEnemy = Cast<AKleeAdventureEnemy>(OtherActor))
+	{
+		// GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Yellow, OtherActor->GetName());
+		// GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Yellow, TEXT("Boom"));
+		OtherEnemy->Damage(50);
 	}
 }
